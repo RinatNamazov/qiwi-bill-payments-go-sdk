@@ -1,4 +1,4 @@
-# qiwi-bill-payments-go-sdk
+# qiwi-bill-payments-go-sdk [![GoDoc](https://pkg.go.dev/badge/github.com/RinatNamazov/qiwi-bill-payments-go-sdk)](https://pkg.go.dev/github.com/RinatNamazov/qiwi-bill-payments-go-sdk)
 
 Golang SDK for QIWI Payments.
 
