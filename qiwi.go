@@ -21,7 +21,7 @@ import (
 
 const (
 	clientName    = "go_sdk"
-	clientVersion = "1.0.0"
+	clientVersion = "1.1.0"
 )
 
 // The API base URL.
@@ -39,6 +39,12 @@ const (
 	PAID     = "PAID"     // Invoice paid.
 	REJECTED = "REJECTED" // Invoice rejected by customer.
 	EXPIRED  = "EXPIRED"  // Invoice expired. Invoice not paid.
+)
+
+// The refund status enum.
+const (
+	PARTIAL = "PARTIAL" // The partial refund of the invoice amount.
+	FULL    = "FULL"    // The full refund of the invoice amount.
 )
 
 // HTTPClient is HTTP client.
@@ -104,7 +110,7 @@ func (m *QiwiBillPaymentsAPI) makeRequest(url, method string, body interface{}, 
 			return err
 		}
 		return errRes
-	} else {
+	} else if resp != nil {
 		err = json.Unmarshal(respData, &resp)
 		if err != nil {
 			return err
@@ -114,12 +120,12 @@ func (m *QiwiBillPaymentsAPI) makeRequest(url, method string, body interface{}, 
 	return nil
 }
 
-// Set new secret key.
+// SetSecretKey sets new secret key.
 func (m *QiwiBillPaymentsAPI) SetSecretKey(secretKey string) {
 	m.secretKey = "Bearer " + secretKey
 }
 
-// CreatePaymentForm - Creating checkout link
+// CreatePaymentForm creating checkout link.
 func (m *QiwiBillPaymentsAPI) CreatePaymentForm(paymentInfo PaymentInfo) string {
 	var v url.Values
 	v.Add("amount", paymentInfo.Amount.Value)
@@ -128,10 +134,13 @@ func (m *QiwiBillPaymentsAPI) CreatePaymentForm(paymentInfo PaymentInfo) string 
 	v.Add("successUrl", paymentInfo.SuccessUrl)
 	v.Add("customFields[apiClient]", clientName)
 	v.Add("customFields[apiClientVersion]", clientVersion)
+	if paymentInfo.ThemeCode != "" {
+		v.Add("customFields[themeCode]", paymentInfo.ThemeCode)
+	}
 	return paymentURL + "?" + v.Encode()
 }
 
-// GetBillInfo - Getting bill info
+// GetBillInfo getting bill info.
 func (m *QiwiBillPaymentsAPI) GetBillInfo(billId string) (*BillResponse, error) {
 	var resp BillResponse
 	err := m.makeRequest(billId, "GET", nil, &resp)
@@ -141,12 +150,11 @@ func (m *QiwiBillPaymentsAPI) GetBillInfo(billId string) (*BillResponse, error) 
 	return &resp, nil
 }
 
-// CreateBillWithThemeCode - Creating bill with theme code
-func (m *QiwiBillPaymentsAPI) CreateBillWithThemeCode(billInfo CreateBillInfo, themeCode string) (*BillResponse, error) {
+// CreateBill creating bill.
+func (m *QiwiBillPaymentsAPI) CreateBill(billInfo CreateBillInfo) (*BillResponse, error) {
 	billRequest := billInfo.GetCreateBillRequest()
 	billRequest.CustomFields.ApiClient = clientName
 	billRequest.CustomFields.ApiClientVersion = clientVersion
-	billRequest.CustomFields.ThemeCode = themeCode
 
 	var resp BillResponse
 	err := m.makeRequest(billInfo.BillId, "PUT", billRequest, &resp)
@@ -161,15 +169,34 @@ func (m *QiwiBillPaymentsAPI) CreateBillWithThemeCode(billInfo CreateBillInfo, t
 	return &resp, nil
 }
 
-// CreateBill - Creating bill
-func (m *QiwiBillPaymentsAPI) CreateBill(billInfo CreateBillInfo) (*BillResponse, error) {
-	return m.CreateBillWithThemeCode(billInfo, "")
-}
-
-// CancelBill - Cancelling unpaid bill
+// CancelBill cancelling unpaid bill.
 func (m *QiwiBillPaymentsAPI) CancelBill(billId string) (*BillResponse, error) {
 	var resp BillResponse
 	err := m.makeRequest(billId+"/reject", "POST", nil, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetRefundInfo getting refund info.
+// Method is not available for individuals.
+func (m *QiwiBillPaymentsAPI) GetRefundInfo(billId, refundId string) (*RefundResponse, error) {
+	var resp RefundResponse
+	err := m.makeRequest(billId+"/refunds/"+refundId, "GET", nil, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// Refund paid bill.
+// Method is not available for individuals.
+func (m *QiwiBillPaymentsAPI) Refund(billId, refundId string, amount MoneyAmount) (*RefundResponse, error) {
+	req := RefundBillRequest{Amount: amount}
+
+	var resp RefundResponse
+	err := m.makeRequest(billId+"/refunds/"+refundId, "PUT", req, &resp)
 	if err != nil {
 		return nil, err
 	}
